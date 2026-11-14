@@ -18,15 +18,11 @@ It provides a responsive terminal interface for managing everyday personal accou
 
 ---
 
-## Installation
+## Installation & Deployment
 
-### Prerequisites
-- Python 3.10 or later
-- Jinja2 (`pip install jinja2`)
+### Method 1: Standard Installation (Linux / macOS)
 
-### Quick Setup
-
-Clone the repository and run the installer:
+**Prerequisites:** Python 3.10+ and Jinja2.
 
 ```bash
 git clone https://github.com/applutan/qashbocks.git
@@ -34,12 +30,85 @@ cd qashbocks
 ./install.sh
 ```
 
-The installer configures `~/.config/qashbocks/config.toml` and links the executable to `~/.local/bin/qashbocks`.
-
-Ensure `~/.local/bin` is in your environment PATH:
+The installer configures `~/.config/qashbocks/config.toml` and symlinks the binary to `~/.local/bin/qashbocks`. Ensure `~/.local/bin` is in your `PATH`:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
+```
+
+---
+
+### Method 2: Docker Container
+
+Qashbocks provides a lightweight container image with no host Python setup required.
+
+#### Build & Run
+```bash
+# Build the Docker image
+docker build -t qashbocks .
+
+# Run accounts overview using the sample database
+docker run --rm qashbocks accounts
+
+# Run interactively with persistent local data
+docker run --rm -it -v $(pwd)/data:/data qashbocks reg checking
+```
+
+#### Docker Compose
+```bash
+# Run any command via compose
+docker compose run --rm qashbocks accounts
+docker compose run --rm qashbocks bills -d 60
+docker compose run --rm qashbocks forecast -a checking -d 90
+```
+
+#### Shell Alias (Optional)
+Add this alias to your `~/.bashrc` or `~/.zshrc` for seamless terminal usage:
+```bash
+alias qashbocks="docker run --rm -it -v \$(pwd)/data:/data qashbocks"
+```
+
+---
+
+### Method 3: Nix & NixOS
+
+Qashbocks includes a modern `flake.nix` and `shell.nix` for declarative, reproducible builds and zero-install execution.
+
+#### Run Directly (Zero-Install via Flakes)
+Run Qashbocks directly from GitHub on any system with Nix installed:
+```bash
+# View sample accounts
+nix run github:applutan/qashbocks -- accounts
+
+# Inspect upcoming bills
+nix run github:applutan/qashbocks -- bills
+
+# Cash-flow forecast
+nix run github:applutan/qashbocks -- forecast -a checking -d 90
+```
+
+#### Development Shell
+Drop into an isolated development environment with all runtimes, Jinja2, Pytest, and SQLite ready:
+
+```bash
+# Using modern Nix flakes:
+nix develop
+
+# Or using classic nix-shell:
+nix-shell
+```
+
+#### NixOS Configuration
+To add Qashbocks as a system-wide or user package in NixOS, add the flake to your inputs:
+
+```nix
+# flake.nix
+inputs.qashbocks.url = "github:applutan/qashbocks";
+
+# In your system or home-manager configuration:
+environment.systemPackages = [
+  inputs.qashbocks.packages.${pkgs.system}.default
+];
 ```
 
 ---

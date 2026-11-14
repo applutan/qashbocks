@@ -1,0 +1,11 @@
+services:
+  qashbocks:
+    build: .
+    image: qashbocks:latest
+    environment:
+      - QASHBOCKS_DB=/data/sample.db
+    volumes:
+      - ./data:/data
+      - ./config.example.toml:/root/.config/qashbocks/config.toml:ro
+    stdin_open: true
+    tty: true
