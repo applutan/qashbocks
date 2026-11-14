@@ -1,0 +1,39 @@
+# ==============================================================================
+# Qashbocks Sample Configuration File
+# ==============================================================================
+# Copy this file to ./config.toml (project-local) or ~/.config/qashbocks/config.toml (user-wide).
+#
+# Precedence for database resolution:
+#   1. CLI argument:             --db <path>
+#   2. Environment variable:     QASHBOCKS_DB=<path>
+#   3. Configuration file:       [defaults] database = "<path>"
+#   4. Built-in fallback:        data/sample.db
+# ==============================================================================
+
+[defaults]
+# Path to the primary SQLite database (supports ~/ expansion or relative paths)
+database = "data/sample.db"
+
+# Default account alias used when none is specified
+account = "checking"
+
+# Default forecast horizon in days for upcoming bills (qashbocks bills)
+bill_horizon_days = 30
+
+# Default window in days for register auditing
+audit_days = 30
+
+# ==============================================================================
+# Account Aliases
+# Maps short CLI aliases to canonical account names in the database.
+# Used by `qashbocks reg <alias>`, `qashbocks add -a <alias>`, etc.
+# ==============================================================================
+[aliases]
+checking = "Main Checking"
+current  = "Main Checking"
+savings  = "High-Yield Savings"
+amex     = "Amex Platinum"
+visa     = "Barclays Visa"
+cash     = "Cash Wallet"
+lucre    = "Cash Wallet"
+euro     = "Euro Travel Cash"
