@@ -78,3 +78,35 @@ Provide an automated statement import pipeline that ingests raw bank files, infe
   - Refine `qashbocks add -f <file>` with interactive dry-run preview and conflict resolution.
 - [ ] **Uncategorised Transaction Review Workflow**:
   - `qashbocks review [--account <als>]` interactive CLI helper to step through uncategorised or newly inferred transactions and assign/confirm categories in bulk.
+
+---
+
+## 4. Multi-Device Architecture: Global Master Database & Remote Access
+
+Because the SQLite database is small and portable, having multiple copies across desktop and laptop risks split-brain divergence and merge conflicts. The goal is an authoritative single source of truth accessible globally without compromising local speed or data integrity.
+
+### A. Phase 1: SSH Remote Execution & Batch Staging (Zero-Code Architecture)
+- [ ] **Centralised Host Deployment**:
+  - Host master database on a primary homelab node/server (e.g. reachable globally via Tailscale/WireGuard).
+  - Laptop invokes commands seamlessly over SSH TTY:
+    ```bash
+    alias qashbocks="ssh -t home-server qashbocks"
+    ```
+  - Eliminates network filesystem (NFS/SSHFS) SQLite locking issues completely by running queries against local disk on the host.
+- [ ] **Offline Staging Workflow**:
+  - When disconnected from internet/VPN, draft line-item entries in a local text file (`today.txt` / `receipts.txt`).
+  - Batch-ingest to master upon reconnect via `qashbocks add -f receipts.txt`.
+
+### B. Phase 2: Decoupled Client/Server Daemon (`qashbocks serve`)
+- [ ] **Pluggable Data Access Layer**:
+  - Abstract SQL query dispatch in `queries.py` to support two operational modes in `config.toml`:
+    - `mode = "local"`: Direct `sqlite3.Connection` to local file.
+    - `mode = "remote"`: Lightweight REST/RPC client communicating with `qashbocks serve` over HTTPS/Tailscale with bearer token authentication.
+  - Keeps all SQLite ACID writes on the server while presenting a transparent CLI experience on client devices.
+
+### C. Phase 3: Distributed Embedded Replicas (libSQL / Turso)
+- [ ] **Evaluation of Embedded Replicas**:
+  - Evaluate replacing `sqlite3` driver with `libsql` to support local read-replicas on portable devices:
+    - Instant offline reads for `accounts`, `reg`, `search`, and `forecast`.
+    - Transparent write delegation to the remote primary master when connected.
+
