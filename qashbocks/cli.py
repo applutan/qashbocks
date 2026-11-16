@@ -1809,6 +1809,7 @@ def main():
 """,
     )
     p_insp.add_argument("htrn", type=str, help="Transaction ID (htrn, e.g. 101 or #101)")
+    p_insp.add_argument("-a", "--all", "--all-bills", action="store_true", dest="all_bills", help="Show all candidate matching bills including terminated and dormant historical schedules")
 
     # currencies / crnc / currency
     p_crnc = subparsers.add_parser(
@@ -1988,6 +1989,8 @@ def main():
         cmd = [sys.executable, str(inspect_script), clean_htrn, "--db", str(args.db)]
         if getattr(args, "format", None):
             cmd.extend(["--format", args.format])
+        if getattr(args, "all_bills", False):
+            cmd.append("--all")
         subprocess.run(cmd)
         sys.exit(0)
 

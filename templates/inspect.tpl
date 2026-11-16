@@ -53,16 +53,23 @@ RECURRING BILL LINKAGE ANALYSIS:
 
 [C] Candidate Matching Recurring Bills by Payee / Account:
 {% for b in matching_bills %}
-  -> Bill Head #{{ b.hbillHead }}: {{ b.payee_name }} | Account: {{ b.acct_name }}
-     Status: {{ 'Active' if (b.st | int) == 1 else 'Terminated/Closed' }}
+  -> Bill Head #{{ b.hbillHead }}: {% if b.link_acct_name %}Transfer {{ b.acct_name }} -> {{ b.link_acct_name }} ({{ b.payee_name }}){% else %}{{ b.payee_name }} | Account: {{ b.acct_name }}{% endif %}
+     Status: {{ 'Terminated/Closed' if b.is_terminated else ('Dormant' if b.is_dormant else 'Active') }}
      Amount: {{ b.bill_amt | gbp }} | Trn Amount: {{ trn.amt | gbp }}
      Frequency: {{ b.frq | freq }} (cFrqInst={{ b.cFrqInst }}) | Next Due: {{ b.dt | date }}
      Next Unpaid Instance: {{ b.iinstNextUnpaid }}
 {% endfor %}
+{% if matching_bills_omitted %}
+  ... and {{ matching_bills_omitted }} older/other candidate bill(s) omitted (use --all to view all).
+{% endif %}
 {% endif %}
 {% if not bills_direct and not bills_template and not matching_bills %}
 
+{% if historical_bills_count %}
+  No active recurring bill linkages found (found {{ historical_bills_count }} dormant/terminated historical bill(s); use --all to view).
+{% else %}
   No recurring bill linkages or candidate matches found for this transaction.
+{% endif %}
 {% endif %}
 {% if linked_txs %}
 
