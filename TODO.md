@@ -10,16 +10,37 @@ Currently, Qashbocks automatically creates new payees on the fly when recording 
 
 ### A. Direct CLI Entity Commands
 - [ ] **Account Creation (`qashbocks account add`)**:
-  - Syntax: `qashbocks account add "<Name>" --alias <als> --type <checking|savings|credit|cash> [--balance <bal>] [--date <YYYY-MM-DD>] [--limit <lim>]`
+  - Syntax: `qashbocks account add "<Name>" --alias <als> --type <checking|savings|credit|cash|loan|investment|pension> [--balance <bal>] [--date <YYYY-MM-DD>] [--limit <lim>]`
   - Creates record in `ACCT` with initial statement anchor (`amtEndRec`, `dtEndRec`), credit limit, and account type flags.
+  - Standardised account types:
+    - `checking` / `current`: Everyday operational cash; positive balance.
+    - `savings`: Reserve deposits, emergency funds, ISAs; positive balance.
+    - `cash`: Physical wallet cash; positive balance.
+    - `credit`: Revolving credit cards (Amex, Visa); stored as negative balance.
+    - `loan`: Mortgages and fixed loans; stored as negative amortised liability.
+    - `investment`: Wealth brokerage and portfolios; tracks securities and cash.
+    - `pension`: Locked retirement funds (SIPP, workplace pensions).
 - [ ] **Account Lifecycle Management**:
   - `qashbocks account edit <alias> [--name <name>] [--limit <lim>] [--alias <new_alias>]`
   - `qashbocks account close <alias>` (sets `fClosed = 1` while preserving ledger history).
 - [ ] **Hierarchical Category Management (`qashbocks category add`)**:
   - Syntax: `qashbocks category add "<Parent:Child>" [--type <expense|income>]`
   - Automatically resolves or creates parent category in `CAT`, linking `hcatParent` appropriately.
-- [ ] **Explicit Payee Management (`qashbocks payee add`)**:
-  - Syntax: `qashbocks payee add "<Name>" [--alias <als>]`
+- [ ] **Explicit Payee Management & 4-Layer Anti-Duplicate Defence**:
+  - *Problem*: Blind automatic registration of every unique payee string causes "duplicate payee hell" (`Waitrose` vs `Waitrose Ltd` vs `Waitrose & Partners` vs `WAITROSE 421 LONDON`).
+  - **Layer 1: Audit Separation**: Store raw transaction/bank text in `TRN.mMemo` while anchoring `TRN.lHpay` to clean canonical merchant entities.
+  - **Layer 2: Payee Aliasing & Match Patterns (`config.toml` / `payees.toml`)**:
+    - Declarative alias mappings for known merchants:
+      ```toml
+      [payee."Waitrose"]
+      aliases = ["Waitrose Ltd", "Waitrose & Partners", "WAITROSE*"]
+      default_category = "Food:Groceries"
+      ```
+  - **Layer 3: Typo Detection via `difflib`**:
+    - On manual entry or batch ingestion of unknown payees, check standard library `difflib.get_close_matches(payee, existing_payees, cutoff=0.8)`. Prompt to link to existing canonical payee or create new alias rather than duplicating.
+  - **Layer 4: Payee Merging Tool (`qashbocks payee merge`)**:
+    - Syntax: `qashbocks payee merge "<Source Duplicate>" "<Target Canonical>"`
+    - Atomic SQL transaction updating `TRN.lHpay` and `BILL.lHpay`, then removing the duplicate from `PAY`.
 
 ### B. Declarative Seed Templates (`--seed`)
 - [ ] **Built-in Starter Taxonomy Templates**:
@@ -34,13 +55,22 @@ Currently, Qashbocks automatically creates new payees on the fly when recording 
 
 Provide an automated statement import pipeline that ingests raw bank files, infers metadata, and simplifies statement reconciliation.
 
-### A. Supported Formats
-- [ ] **Structured Ingestion (CSV / QIF / OFX / QFX)**:
-  - Zero-dependency parser for standard QIF, OFX, and configurable CSV formats.
+> [!TIP]
+> **Unix Pipeline Principle (Wheel Reinvention Avoidance)**:
+> Qashbocks will NOT embed a proprietary, heavyweight PDF layout or OCR engine in core. PDFs are visual layout descriptions, not data interchange formats.
+> Instead, Qashbocks relies on existing Unix tooling (`pdftotext -layout` via `poppler-utils`) and lightweight bank-specific regex filters to pre-process PDFs into clean text streams piped directly into `qashbocks add -f -`.
+> Qashbocks core remains strictly responsible for the ledger: deduplication, payee canonicalisation, category inference, bill matching, and statement balance anchoring.
+
+### A. Supported Formats & Pipeline Architecture
+- [ ] **Structured Plain-Text Ingestion (CSV / QIF / OFX / QFX)**:
+  - Zero-dependency parser for standard QIF, OFX, and configurable CSV bank exports.
   - Per-bank CSV column mapping configuration in `config.toml` (Date, Payee/Narrative, Amount/Debit/Credit, Running Balance).
-- [ ] **Bank PDF Statement Scraper**:
-  - Extraction module using `pypdf` or `pdfplumber` for visual PDF statements.
-  - Pluggable bank-specific layout adaptors for major UK / retail banks (e.g. TSB, Lloyds, Barclays, NatWest, Monzo).
+- [ ] **External PDF Pre-Filter Pipeline (`pdftotext -layout` Composition)**:
+  - Modular shell / Python pre-filters for major retail banks (e.g. `filters/lloyds_pdf.py`, `filters/amex_pdf.py`).
+  - Pipeline invocation:
+    ```bash
+    pdftotext -layout statement.pdf - | bank_filter.py | qashbocks add -f - -n
+    ```
 
 ### B. Automated Metadata Inference & Cleaning
 - [ ] **Payee Normalisation**:
@@ -109,4 +139,27 @@ Because the SQLite database is small and portable, having multiple copies across
   - Evaluate replacing `sqlite3` driver with `libsql` to support local read-replicas on portable devices:
     - Instant offline reads for `accounts`, `reg`, `search`, and `forecast`.
     - Transparent write delegation to the remote primary master when connected.
+
+---
+
+## 5. Universal Plain-Text Export & Legacy Roundtrip Verification Suite (`qashbocks export`)
+
+To guarantee long-term data portability and provide an airtight test harness for the MS Money retirement, Qashbocks will support full bidirectional plain-text roundtripping.
+
+### A. Comprehensive Text Exporter (`qashbocks export`)
+- [ ] **Command**: `qashbocks export [--dir <path>] [--format <csv|json|md>]`
+  - Dumps the entire database into clean, human-editable, version-controllable text files:
+    1. `accounts.csv`: Account names, aliases, types, starting balances, and statement anchor dates.
+    2. `categories.txt`: Hierarchical category tree.
+    3. `bills.csv`: Recurring bill schedules, amounts, frequencies, and next due dates.
+    4. `history.csv`: Full canonical 7-column transaction ledger (`Date, Account, Payee, Amount, Category, Memo, Recur`).
+
+### B. Legacy vs Qashbocks Agreement Verification Harness
+- [ ] **Automated Agreement Audit Script (`tools/verify_legacy_roundtrip.py`)**:
+  - **The Goal**: Export the current access-aware legacy database (`money.db` with 51,000+ historical records across 50 years) into canonical plain text, import the text into a completely fresh Qashbocks database (`clean.db`), and mathematically verify that both databases 100% agree:
+    - **Balance Verification**: Every active account balance and total liquid net worth matches to the exact penny.
+    - **Reconciliation Statuses**: Uncleared (`cs=0`), cleared (`cs=1`), and reconciled (`cs=2`) counts match identically.
+    - **Register Integrity**: Running balances match on every historical date.
+    - **Cash-Flow Forecast**: Multi-horizon projections (`bills`, `forecast`) produce identical future trough and peak curves.
+  - Serves as the ultimate proof of correctness and peace of mind before permanently decommissioning Microsoft Money.
 

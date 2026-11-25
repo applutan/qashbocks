@@ -4,10 +4,13 @@ Qashbocks is a fast, standalone personal finance ledger and cash-flow command-li
 
 It provides a responsive terminal interface for managing everyday personal accounts, tracking running balances, searching split transactions, and projecting cash flows with recurring bill schedules.
 
+Originally engineered as a clean, modern alternative to legacy Microsoft Money, Qashbocks operates on standard **SQLite** databases with **zero dependencies on Microsoft Access, Jet engines, Windows, Wine, or Java**.
+
 ---
 
 ## Features
 
+- **MS-Access-Free & Native**: Pure SQLite persistence engine running natively on Linux and macOS.
 - **Multi-Account Register**: View transaction activity, uncleared entries, running balances, and statement reconciliation status across bank accounts, savings, credit cards, and cash wallets.
 - **Statement Reconciliation**: Interactive reconciliation wizard to balance monthly bank and card statements against register transactions.
 - **Universal Search**: Fast substring and numeric search across all transactions, memos, categories, and child line-item splits.
@@ -30,7 +33,7 @@ cd qashbocks
 ./install.sh
 ```
 
-The installer configures `~/.config/qashbocks/config.toml` and symlinks the binary to `~/.local/bin/qashbocks`. Ensure `~/.local/bin` is in your `PATH`:
+The installer configures `~/.config/qashbocks/config.toml` (or symlinks your repository `config.toml`) and symlinks the binary to `~/.local/bin/qashbocks`. Ensure `~/.local/bin` is in your `PATH`:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -136,6 +139,56 @@ qashbocks forecast -a checking -d 90
 
 # 6. Deep inspection of an entry and attached recurring bill
 qashbocks inspect 101
+```
+
+---
+
+## Daily Batch Ingestion (End-of-Day Quickies)
+
+For rapid end-of-day logging, Qashbocks supports batch file ingestion via `qashbocks add -f <file>` (or standard input `cat file | qashbocks add -f -`).
+
+Two concise formats are accepted:
+
+### 1. Concise 7-Column CSV Format
+A lightweight, comma-separated line per transaction:
+```csv
+[Date],[Account],[Payee],[Amount],[Category],[Memo],[Recur/Bill]
+```
+- **Date**: `YYYY-MM-DD`, `YYYYMMDD`, or **blank** for today.
+- **Account**: Account alias (`checking`, `savings`, `amex`, `cash`, etc.).
+- **Payee**: Destination payee name.
+- **Amount**: Expense amount as a positive number (currency signs like `£`, `$`, `€` are stripped; prefix with `+` for deposits).
+- **Category**: (Optional) e.g. `Food:Groceries`, `Dining Out`.
+- **Memo**: (Optional) Notes or narrative description.
+- **Recur/Bill**: (Optional) Bill ID (e.g. `#12` or `12`) to advance recurring schedule, `MATCH` for automatic candidate matching, or blank for regular expense.
+
+#### Example Batch File (`eod.csv`):
+```csv
+# Daily transactions for today:
+, checking, Waitrose, 24.50, Food:Groceries, Weekly fruit and bread
+, cash, Pret A Manger, 3.85, Food:On the Hoof, Morning coffee
+, amex, Amazon, 18.99, Books:Non-Fiction, Maths book
+, checking, British Telecom, 42.00, Bills:Telephone, , #1397
+
+# Historic entries or income:
+2026-11-20, checking, Client Payment, +500.00, Income:Consulting, Invoice #104
+```
+
+### 2. Line Commands & Bill Skips
+You can also supply CLI argument flags directly per line:
+```text
+-a checking -p "Waitrose" -m 24.50 -c "Food:Groceries"
+-a checking -t cash -m 50.00 --memo "ATM Cash withdrawal"
+skip #2721
+```
+
+### Safe Ingestion & Dry-Run Simulation
+```bash
+# 1. Preview changes safely without touching the database (dry run):
+qashbocks add -f eod.csv -n
+
+# 2. Ingest and commit:
+qashbocks add -f eod.csv -y
 ```
 
 ---
